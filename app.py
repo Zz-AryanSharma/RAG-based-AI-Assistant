@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import datetime
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -16,17 +17,26 @@ if "GEMINI_API_KEY" not in st.session_state:
 
 with st.sidebar:
     st.title("Settings")
-    # Allow user to input key if not running with secrets configured yet
-    api_key = st.text_input("Gemini API Key", type="password", help="Get your API key from Google AI Studio")
-    if api_key:
-        st.session_state.GEMINI_API_KEY = api_key
-        os.environ["GOOGLE_API_KEY"] = api_key
-    elif "GEMINI_API_KEY" in st.secrets: 
+    # Hide the API key input from reviewers if it's securely stored in Streamlit Secrets
+    if "GEMINI_API_KEY" in st.secrets:
         st.session_state.GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-        os.environ["GOOGLE_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+    else:
+        api_key = st.text_input("Gemini API Key (Local Testing)", type="password")
+        if api_key:
+            st.session_state.GEMINI_API_KEY = api_key
 
     st.markdown("---")
     st.markdown("Built for **IEEE RAS** using publicly available information.")
+
+    st.markdown("---")
+    admin_pw = st.text_input("Admin Panel (Enter Password)", type="password")
+    if admin_pw == "Aryan_Sharma":
+        st.subheader("Search History Logs")
+        if os.path.exists("search_logs.txt"):
+            with open("search_logs.txt", "r") as f:
+                st.text_area("Reviewer Searches:", f.read(), height=300)
+        else:
+            st.write("No searches recorded yet.")
 
 # Halt if no API key is available
 if not st.session_state.GEMINI_API_KEY:
@@ -120,6 +130,13 @@ for message in st.session_state.messages:
 
 # React to user input
 if prompt := st.chat_input("E.g., What are the benefits of membership?"):
+    
+    # --- Logging Feature ---
+    with open("search_logs.txt", "a") as f:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"[{timestamp}] User asked: {prompt}\n")
+    # -----------------------
+
     # Display user message in chat message container
     st.chat_message("user").markdown(prompt)
     # Add user message to chat history
