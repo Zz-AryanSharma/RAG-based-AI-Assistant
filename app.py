@@ -4,8 +4,6 @@ from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
 # --- CONFIGURATION ---
@@ -39,7 +37,11 @@ if not st.session_state.GEMINI_API_KEY:
 @st.cache_resource
 def get_vectorstore():
     """Loads documents, or loads the existing vector store if it exists."""
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    api_key = st.session_state.GEMINI_API_KEY.strip()
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/gemini-embedding-2", 
+        google_api_key=api_key
+    )
     persist_directory = "./chroma_db"
     
     # Check if the database already exists on disk
@@ -63,12 +65,20 @@ def get_vectorstore():
     vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings, persist_directory=persist_directory)
     return vectorstore
 
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+
 def get_rag_chain():
-    """Sets up the retrieval chain with LLM and prompt."""
+    """Sets up the retrieval chain with LLM and prompt using LCEL."""
     vectorstore = get_vectorstore()
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3}) # Retrieve top 3 chunks
     
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
+    api_key = st.session_state.GEMINI_API_KEY.strip()
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-3.5-flash", 
+        temperature=0, 
+        google_api_key=api_key
+    )
 
     system_prompt = (
         "You are a helpful AI assistant for the IEEE Robotics and Automation Society (RAS). "
@@ -82,9 +92,16 @@ def get_rag_chain():
         ("system", system_prompt),
         ("human", "{input}"),
     ])
+    
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
 
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+    rag_chain = (
+        {"context": retriever | format_docs, "input": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
     
     return rag_chain
 
@@ -114,8 +131,7 @@ if prompt := st.chat_input("E.g., What are the benefits of membership?"):
     with st.chat_message("assistant"):
         with st.spinner("Searching and thinking..."):
             try:
-                response = rag_chain.invoke({"input": prompt})
-                answer = response["answer"]
+                answer = rag_chain.invoke(prompt)
                 st.markdown(answer)
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": answer})
