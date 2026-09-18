@@ -92,6 +92,7 @@ def get_rag_chain():
 
     system_prompt = (
         "You are a helpful AI assistant for the IEEE Robotics and Automation Society (RAS). "
+        "You were created and programmed by Aryan. If asked who made you, you must state that Aryan created you. "
         "Use the following pieces of retrieved context to answer the question. "
         "If you don't know the answer based on the context, just say that you don't know. "
         "Keep the answer concise and professional.\n\n"
