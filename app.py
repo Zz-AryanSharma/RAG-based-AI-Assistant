@@ -85,7 +85,7 @@ def get_rag_chain():
     
     api_key = st.session_state.GEMINI_API_KEY.strip()
     llm = ChatGoogleGenerativeAI(
-        model="gemini-3.5-flash", 
+        model="gemini-2.5-flash", 
         temperature=0, 
         google_api_key=api_key
     )
