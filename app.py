@@ -18,7 +18,12 @@ if "GEMINI_API_KEY" not in st.session_state:
 with st.sidebar:
     st.title("Settings")
     # Hide the API key input from reviewers if it's securely stored in Streamlit Secrets
-    if "GEMINI_API_KEY" in st.secrets:
+    try:
+        has_secret = "GEMINI_API_KEY" in st.secrets
+    except Exception:
+        has_secret = False
+
+    if has_secret:
         st.session_state.GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     else:
         api_key = st.text_input("Gemini API Key (Local Testing)", type="password")
